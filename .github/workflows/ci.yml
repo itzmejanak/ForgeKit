@@ -1,0 +1,78 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+env:
+  # Toolchain pinned to the versions the build files declare (see README "Build from source").
+  ANDROID_PACKAGES: >-
+    platform-tools
+    platforms;android-35
+    build-tools;35.0.0
+    ndk;27.0.12077973
+    cmake;3.22.1
+
+jobs:
+  build:
+    name: Test and build
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - name: Check out
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@de7274f081f381c8f8158605e0321c36c376e2e6 # v6
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@40fd30fb8d7440372e1316f5d1809ec01dcd3699 # v4
+        with:
+          packages: ${{ env.ANDROID_PACKAGES }}
+
+      - name: Set up Gradle (validates the wrapper)
+        uses: gradle/actions/setup-gradle@9c971963bec38e04b3d30dcc455b5382be2fdbfb # v6
+        with:
+          cache-read-only: ${{ github.ref != 'refs/heads/main' }}
+
+      - name: Give Gradle the runner's memory
+        # User-level properties override the project's gradle.properties (tuned for small machines).
+        run: mkdir -p ~/.gradle && printf 'org.gradle.jvmargs=-Xmx4g -XX:MaxMetaspaceSize=1g -Dfile.encoding=UTF-8\norg.gradle.workers.max=4\n' >> ~/.gradle/gradle.properties
+
+      - name: Run tests
+        run: ./gradlew test --continue
+
+      - name: Verify bundled bootstrap provenance
+        run: (cd third-party/termux-bootstrap && sha256sum -c SHA256SUMS)
+
+      - name: Build debug APK and command-line tools
+        run: ./gradlew :app:assembleDebug :tools:forge-builder:distZip :tools:forge-validator:distZip
+
+      - name: Upload test reports
+        if: failure()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: test-reports
+          path: |
+            **/build/reports/tests/
+            **/build/test-results/
+          retention-days: 7
+
+      - name: Upload debug APK
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: forgekit-debug-apk
+          path: app/build/outputs/apk/debug/*.apk
+          retention-days: 14

@@ -1,0 +1,45 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <!--
+      The embedded runtime is the network client: apt/pkg fetch packages, and plugins
+      use curl/wget/pip/npm/git inside it (ARCHITECTURE §43). Without INTERNET every
+      lookup in the runtime fails at DNS resolution. §23: the ForgeKit `network`
+      permission is policy on top of this Android permission, not a replacement.
+    -->
+    <uses-permission android:name="android.permission.INTERNET" />
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+
+    <!--
+      Job/plugin output lands in a user-visible directory (/sdcard/ForgeKit) so results
+      survive uninstall and can be opened by other apps. targetSdk 28 (pinned for exec()
+      in app data) keeps legacy external storage, so these two runtime permissions grant
+      direct filesystem access there — no SAF round-trip for ForgeKit's own output tree.
+    -->
+    <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" />
+    <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" />
+
+    <application
+        android:name=".ForgeKitApplication"
+        android:allowBackup="false"
+        android:hasFragileUserData="true"
+        android:icon="@mipmap/ic_launcher"
+        android:roundIcon="@mipmap/ic_launcher_round"
+        android:label="ForgeKit"
+        android:requestLegacyExternalStorage="true"
+        android:supportsRtl="true"
+        android:theme="@style/Theme.ForgeKit">
+
+        <activity
+            android:name=".MainActivity"
+            android:exported="true"
+            android:configChanges="orientation|screenSize|screenLayout|keyboardHidden|uiMode"
+            android:windowSoftInputMode="adjustResize">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity>
+    </application>
+
+</manifest>

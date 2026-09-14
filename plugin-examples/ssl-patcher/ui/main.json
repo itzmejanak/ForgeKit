@@ -1,0 +1,12 @@
+{
+  "schema": "forgekit.ui/v1",
+  "title": "Inspect APK",
+  "description": "Inventory native libraries and write a plan artifact.",
+  "blocks": [
+    { "type": "input", "id": "target-in", "action": "inspect", "input": "target", "label": "Target APK" },
+    { "type": "option", "id": "arch-opt", "action": "inspect", "option": "arch", "label": "Architecture" },
+    { "type": "progress", "id": "inspect-progress" },
+    { "type": "log", "id": "inspect-log" },
+    { "type": "action", "id": "go", "invoke": "inspect", "label": "Inspect" }
+  ]
+}

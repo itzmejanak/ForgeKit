@@ -1,0 +1,47 @@
+# Build outputs
+build/
+**/build/
+.gradle/
+local.properties
+
+# IDE
+.idea/
+*.iml
+.vscode/
+
+# Kotlin/Java
+*.class
+*.jar.kotlin_metadata
+
+# Native
+.cxx/
+*.so.debug
+
+# ForgeKit artifacts
+*.forge
+!plugin-examples/**/*.forge.md
+
+# Android
+*.apk.idsig
+*.ap_
+*.dex
+captures/
+.externalNativeBuild/
+
+# OS
+.DS_Store
+session.txt
+.commandcode/
+
+# Release signing material never lives in the repository (see Docs/RELEASING.md)
+*.keystore
+*.jks
+signing/
+
+# Private working notes (kept locally, not published)
+Todo.md
+Work.md
+Note.txt
+Docs/ForgeKit Implementation Agent Prompt.md
+Docs/HARDENING_PLAN.md
+.kotlin/

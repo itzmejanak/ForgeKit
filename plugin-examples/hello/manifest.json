@@ -1,0 +1,26 @@
+{
+  "schema": "forgekit.plugin/v1",
+  "id": "com.forgekit.hello",
+  "name": "Hello Protocol",
+  "version": "1.0.0",
+  "description": "Minimal real ForgeKit protocol plugin.",
+  "author": "ForgeKit",
+  "tags": ["example", "protocol"],
+  "runtime": { "type": "python", "version": ">=3.6" },
+  "entrypoint": "runtime/main.py",
+  "ui": { "entry": "ui/main.json" },
+  "dependencies": { "termux": ["python"], "python": [], "node": [] },
+  "permissions": ["ui.progress"],
+  "actions": [
+    {
+      "id": "greet",
+      "title": "Greet",
+      "description": "Return a greeting through forgekit/1.",
+      "inputs": [
+        { "id": "name", "label": "Name", "type": "text", "required": true }
+      ],
+      "options": [],
+      "outputs": [{ "id": "greeting", "label": "Greeting", "type": "value" }]
+    }
+  ]
+}

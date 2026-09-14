@@ -1,0 +1,23 @@
+{
+  "schema": "forgekit.plugin/v1",
+  "id": "com.forgekit.interactive",
+  "name": "Interactive Protocol",
+  "version": "1.0.0",
+  "description": "Golden host-mediated prompt example.",
+  "author": "ForgeKit",
+  "tags": ["example", "interactive"],
+  "runtime": { "type": "python", "version": ">=3.6" },
+  "entrypoint": "runtime/main.py",
+  "dependencies": { "termux": ["python"], "python": [], "node": [] },
+  "permissions": [],
+  "actions": [
+    {
+      "id": "authorize",
+      "title": "Authorize",
+      "description": "Request one password value from the host.",
+      "inputs": [],
+      "options": [],
+      "outputs": [{ "id": "accepted", "type": "value" }]
+    }
+  ]
+}

@@ -1,0 +1,12 @@
+{
+  "schema": "forgekit.ui/v1",
+  "title": "Hello",
+  "description": "Enter a name and run the greeting action.",
+  "blocks": [
+    { "type": "static", "id": "intro", "text": "A minimal forgekit/1 action." },
+    { "type": "input", "id": "name-in", "action": "greet", "input": "name", "label": "Name" },
+    { "type": "progress", "id": "greet-progress" },
+    { "type": "log", "id": "greet-log" },
+    { "type": "action", "id": "go", "invoke": "greet", "label": "Greet" }
+  ]
+}

@@ -1,0 +1,23 @@
+{
+  "schema": "forgekit.plugin/v1",
+  "id": "com.forgekit.sslpatcher",
+  "name": "APK Library Inspector",
+  "version": "1.0.0",
+  "description": "Inspect an APK library tree and write a patch-plan artifact; does not patch the APK.",
+  "author": "ForgeKit",
+  "tags": ["example", "android"],
+  "runtime": { "type": "python", "version": ">=3.6" },
+  "entrypoint": "runtime/inspect.py",
+  "ui": { "entry": "ui/main.json" },
+  "dependencies": { "termux": ["python"], "python": [], "node": [] },
+  "permissions": ["artifact.read", "artifact.write", "ui.progress"],
+  "actions": [
+    {
+      "id": "inspect",
+      "title": "Inspect APK",
+      "inputs": [{ "id": "target", "label": "Target APK", "type": "file", "required": true }],
+      "options": [{ "id": "arch", "label": "Architecture", "type": "select", "choices": ["Auto detect", "ARM", "ARM64", "x86", "x64"], "default": "Auto detect" }],
+      "outputs": [{ "id": "report", "type": "value" }, { "id": "plan", "type": "file" }]
+    }
+  ]
+}

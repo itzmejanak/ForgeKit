@@ -1,0 +1,58 @@
+name: Bug report
+description: Something in ForgeKit does not work as expected.
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: Thanks for the report. Please do not include secrets, passwords or private package contents.
+  - type: input
+    id: version
+    attributes:
+      label: ForgeKit version
+      description: Settings → About, or the release you installed.
+      placeholder: 0.1.0
+    validations:
+      required: true
+  - type: input
+    id: device
+    attributes:
+      label: Device and Android version
+      placeholder: Pixel 8, Android 15
+    validations:
+      required: true
+  - type: dropdown
+    id: area
+    attributes:
+      label: Area
+      options:
+        - Runtime / bootstrap
+        - Terminal
+        - Plugin import / validation
+        - Dependency provisioning
+        - Jobs
+        - Plugin UI
+        - Command-line tools
+        - Other
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      placeholder: |
+        1. Open …
+        2. Tap …
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected and actual behavior
+    validations:
+      required: true
+  - type: textarea
+    id: logs
+    attributes:
+      label: Logs
+      description: Job log output or `adb logcat` lines mentioning ForgeKit, if available.
+      render: text

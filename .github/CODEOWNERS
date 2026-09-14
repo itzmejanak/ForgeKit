@@ -1,0 +1,7 @@
+# Default reviewer for every change.
+* @itzmejanak
+
+# Release pipeline and signing: changes need the maintainer's review.
+/.github/ @itzmejanak
+/tools/release/ @itzmejanak
+/app/build.gradle.kts @itzmejanak

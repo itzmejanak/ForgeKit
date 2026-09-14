@@ -1,0 +1,13 @@
+# Merge order for the in-app developer guide. One sibling Markdown file per line.
+00-overview.md
+01-package-format.md
+02-manifest.md
+03-declarative-ui.md
+04-runtime-protocol.md
+05-dependency-providers.md
+06-security-and-storage.md
+07-lifecycle-and-observability.md
+08-platform-capabilities.md
+08-working-example.md
+09-build-test-and-handoff.md
+10-limitations-and-hardening.md
