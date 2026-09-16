@@ -116,9 +116,6 @@ public object ForgeSpacing {
 
     /** Height of a log console embedded in a scrolling page (plugin detail, plugin UI log block). */
     public val consoleEmbeddedHeight: Dp = 240.dp
-
-    /** Bottom clearance for scrolling content under a floating action button (56 FAB + 2 × 16 margin). */
-    public val fabClear: Dp = 88.dp
 }
 
 /** Headings, controls and display type — Chakra Petch. */

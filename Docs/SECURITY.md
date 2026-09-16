@@ -54,7 +54,7 @@ content classification → canonical hash manifest → ed25519 signature →
 facts to the user → approval. A defect at any stage stops the import with a
 precise violation (never a silent skip).
 
-## What v0.1.0 does not claim
+## What v0.1.1 does not claim
 
 No per-plugin seccomp/namespace sandboxing yet, no permission-gated network
 firewall, no certificate pinning for dependency downloads. The trust model,

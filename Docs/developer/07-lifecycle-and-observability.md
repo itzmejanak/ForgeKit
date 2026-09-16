@@ -44,7 +44,7 @@ The import screen receives structured events for the full plan, provider phases,
 
 Action cancellation asks the runtime for `SIGTERM`, waits five seconds in the embedded runtime, then escalates to `SIGKILL`. The default whole-job timeout is ten minutes. Dependency commands have their own two-minute default timeout.
 
-There is no Android foreground service for plugin jobs in `0.1.0`. Navigating between screens keeps the ViewModel process job alive, but Android may kill the process in background. Job records survive; execution continuity does not. At next startup, a non-terminal record is failed when its runtime process is provably gone. Runtime process tracking itself is in-memory, so this is not a durable process reattachment design.
+There is no Android foreground service for plugin jobs in `0.1.1`. Navigating between screens keeps the ViewModel process job alive, but Android may kill the process in background. Job records survive; execution continuity does not. At next startup, a non-terminal record is failed when its runtime process is provably gone. Runtime process tracking itself is in-memory, so this is not a durable process reattachment design.
 
 ### Output semantics
 

@@ -7,6 +7,26 @@ heading matches the pushed tag as the GitHub release notes.
 
 ## [Unreleased]
 
+## [0.1.1] - 2026-09-16
+
+### Changed
+
+- Developer guide export is now a minimal Settings-header action instead of a Home floating
+  button.
+- Terminal and job/provider consoles share zoom feedback and tooltip-backed controls; terminal
+  output supports long-press range selection, while log output supports native text selection,
+  copy-all and pinch zoom. One stable bottom-right console action shows Copy at the live tail and
+  flips to Go to latest only while the user is paused above newer output.
+
+### Fixed
+
+- Termux post-install relocation now rewrites large ELF and non-ELF files with bounded memory,
+  preventing OpenJDK-sized runtime files from exhausting Android's app heap after otherwise
+  successful package installs.
+- Package presence can no longer hide an interrupted relocation/configuration phase. A durable
+  reconciliation marker is repaired at startup or by idempotent provisioning before dependencies
+  are reported ready.
+
 ## [0.1.0] - 2026-09-14
 
 First public release.
@@ -32,5 +52,6 @@ First public release.
 - Package symlinks that pointed into the Termux app's directory (for example apt's signing keys)
   are re-pointed into ForgeKit's prefix, so `apt update` verifies repositories again.
 
-[Unreleased]: https://github.com/itzmejanak/ForgeKit/compare/v0.1.0...HEAD
+[Unreleased]: https://github.com/itzmejanak/ForgeKit/compare/v0.1.1...HEAD
+[0.1.1]: https://github.com/itzmejanak/ForgeKit/compare/v0.1.0...v0.1.1
 [0.1.0]: https://github.com/itzmejanak/ForgeKit/releases/tag/v0.1.0

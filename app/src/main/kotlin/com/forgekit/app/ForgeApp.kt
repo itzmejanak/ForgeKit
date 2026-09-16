@@ -319,7 +319,6 @@ public fun ForgeApp(
                         onImport = { nav.push(Overlay.Import()) },
                         onOpenJobs = { nav.selectTab(Tab.JOBS) },
                         onOpenPlugin = { nav.push(Overlay.PluginDetail(it)) },
-                        onDownloadDocs = viewModel::downloadDeveloperDocs,
                         modifier = contentModifier,
                     )
                     Tab.PLUGINS -> PluginListScreen(

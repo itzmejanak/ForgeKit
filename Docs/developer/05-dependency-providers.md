@@ -1,6 +1,6 @@
 ## Dependency providers
 
-ForgeKit resolves only three dependency kinds in `0.1.0`. Resolution always inspects first, emits a plan, installs missing items sequentially, and verifies provider state after each attempt. The UI prevents more than one provisioning flow from running at once.
+ForgeKit resolves only three dependency kinds in `0.1.1`. Resolution always inspects first, emits a plan, converges each item sequentially, and verifies provider state after each attempt. An item already present in a streaming provider still passes through its idempotent verification/reconciliation path; that does not rerun its package manager when the provider is clean. The UI prevents more than one provisioning flow from running at once.
 
 | Manifest group | Provider label | Presence check | Install command |
 |---|---|---|---|
@@ -13,6 +13,13 @@ The runtime family is automatically added as a Termux package when `runtime.type
 ### Provider ownership and author duties
 
 ForgeKit owns plan ordering, progress events, one-at-a-time orchestration, failure reporting, and final verification. The actual package managers own repository configuration, transitive resolution, scripts, native builds, network traffic, upgrades, and their package databases.
+
+For a Termux package, `dpkg-query` answers only package presence. ForgeKit separately owns the
+relocation of compiled Termux paths and the final `dpkg --configure -a` pass. It writes a durable
+pending marker before dpkg mutation (including package changes made from the Terminal tab) and
+clears it only after both operations succeed. App startup or a later provisioning request repairs
+a pending marker before treating an already-present package as ready. Large runtime files are
+relocated with bounded 8 MiB windows rather than whole-file heap reads.
 
 Plugin authors must:
 

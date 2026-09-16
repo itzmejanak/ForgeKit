@@ -164,7 +164,10 @@ public class DependencyResolver(
         val results = mutableListOf<DependencyInstallResult>()
         for (plan in plans) {
             val dependency = dependencyOf(plan)
-            if (plan.alreadyPresent) {
+            if (plan.alreadyPresent && runtime !is StreamingInstaller) {
+                // Legacy runtimes expose only a capability snapshot. Preserve that fallback,
+                // but never use a streaming runtime's planning snapshot as the final answer:
+                // its idempotent install path also reconciles interrupted provider state.
                 val present = DependencyInstallResult(
                     dependency = dependency,
                     installed = true,
@@ -175,7 +178,9 @@ public class DependencyResolver(
                 events.emit(ResolutionEvent.Completed(dependency, present))
                 continue
             }
-            events.emit(ResolutionEvent.Resolving(dependency, InstallPhase.INSPECTING, null))
+            if (!plan.alreadyPresent) {
+                events.emit(ResolutionEvent.Resolving(dependency, InstallPhase.INSPECTING, null))
+            }
             val result = installWithProgress(dependency, events)
             results += result
             events.emit(ResolutionEvent.Completed(dependency, result))

@@ -63,6 +63,12 @@ class EmbeddedTermuxRuntimeTest {
             val bin = prefix.resolve("bin")
             Files.createDirectories(bin)
             Files.createDirectories(prefix.resolve("var/lib/dpkg"))
+            Files.createDirectories(prefix.resolve("var/lib/forgekit"))
+            // This host fixture represents a fully initialized existing prefix. Migration and
+            // interrupted-relocation behavior is covered by BootstrapOrchestratorTest.
+            Files.newOutputStream(prefix.resolve("var/lib/forgekit/relocation-v2-complete")).use {
+                it.write("complete\n".toByteArray())
+            }
             Files.createDirectories(root.resolve("termux/home"))
             Files.createDirectories(prefix.resolve("tmp"))
 

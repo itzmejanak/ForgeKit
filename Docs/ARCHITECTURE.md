@@ -828,6 +828,25 @@ ForgeKit resolves and verifies the dependency graph.
 
 The actual installation is performed by the appropriate package manager.
 
+For Termux packages, package-database presence is necessary but is not sufficient for
+readiness. A successful provider result requires both:
+
+```text
+dpkg status = installed
+AND
+ForgeKit relocation + dpkg configuration = complete
+```
+
+ForgeKit writes a durable reconciliation marker before dpkg can mutate the prefix and clears it
+only after the full relocation/configuration phase succeeds. Startup and idempotent provisioning
+must repair a pending marker before reporting the runtime or dependency ready. This prevents an
+interrupted post-install phase from appearing fixed merely because a retry sees `installed` in
+the package database.
+
+Prefix relocation must have a bounded heap cost. Large ELF and non-ELF runtime files are scanned
+through fixed-size overlapping windows; no package/runtime file may be loaded whole merely to
+replace a compiled Termux path.
+
 ---
 
 # 20. Dependency Ownership
@@ -1210,6 +1229,10 @@ repair()
 reinitialize()
 diagnostics()
 ```
+
+Runtime recovery includes an interrupted package transaction whose dpkg database is already
+updated but whose files have not completed ForgeKit relocation/configuration. This state is
+persisted in the runtime prefix and reconciled before `READY`.
 
 Never require the user to manually reinstall ForgeKit for a recoverable runtime problem.
 

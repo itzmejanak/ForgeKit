@@ -87,6 +87,12 @@ public class BootstrapOrchestrator(
         /** ForgeKit's own state dir inside $PREFIX (holds the dpkg-wrapper's find-newer stamp). */
         private const val FORGEKIT_STATE_DIR = "var/lib/forgekit"
 
+        /** Durable transaction marker: package state changed but full relocation is unfinished. */
+        private const val RELOCATION_PENDING = "$FORGEKIT_STATE_DIR/relocation-pending"
+
+        /** Bump when an existing prefix must receive a new full relocation pass. */
+        private const val RELOCATION_SCHEMA = "$FORGEKIT_STATE_DIR/relocation-v2-complete"
+
         /** Config and state directories apt expects to exist inside $PREFIX. */
         private val APT_DIRECTORIES = listOf(
             "etc/apt/apt.conf.d",
@@ -114,6 +120,29 @@ public class BootstrapOrchestrator(
                 components = listOf("main", "root"),
             ),
         )
+    }
+
+    /** True when package presence alone is insufficient to call the prefix ready. */
+    public fun relocationReconciliationPending(): Boolean =
+        Files.exists(targets.prefix.resolve(RELOCATION_PENDING))
+
+    /**
+     * Marks the prefix dirty before any dpkg mutation. The marker is deliberately durable:
+     * process death, an OOM or a failed maintainer script must make the next run reconcile
+     * instead of treating dpkg's `installed` status as the whole truth.
+     */
+    public fun markRelocationPending() {
+        val marker = targets.prefix.resolve(RELOCATION_PENDING)
+        Files.createDirectories(marker.parent)
+        Files.writeString(marker, "pending\n")
+    }
+
+    private fun markRelocationComplete() {
+        val complete = targets.prefix.resolve(RELOCATION_SCHEMA)
+        Files.createDirectories(complete.parent)
+        Files.writeString(complete, "complete\n")
+        // Complete first, clear pending last. A crash between the two safely re-runs repair.
+        Files.deleteIfExists(targets.prefix.resolve(RELOCATION_PENDING))
     }
 
     // ---- steps --------------------------------------------------------------------
@@ -156,6 +185,7 @@ public class BootstrapOrchestrator(
         // the data root ($PREFIX/$HOME) and apt's cache root map onto our app data dir.
         try {
             PrefixRewriter(logger).rewrite(targets.prefix, relocationRules(descriptor), relocationSkip())
+            markRelocationComplete()
         } catch (e: Exception) {
             return BootResult.InitializationFailed("prefix relocation failed: ${e.message}")
         }
@@ -266,6 +296,9 @@ public class BootstrapOrchestrator(
 
         // Home for the dpkg wrapper's find-newer stamp.
         Files.createDirectories(targets.prefix.resolve(FORGEKIT_STATE_DIR))
+        // Existing installations created before this reconciliation contract receive one full,
+        // bounded relocation pass. Fresh bootstraps already wrote the completion marker above.
+        if (Files.notExists(targets.prefix.resolve(RELOCATION_SCHEMA))) markRelocationPending()
         writeRelocationHook(descriptor)
     }
 
@@ -313,6 +346,7 @@ public class BootstrapOrchestrator(
         val realDpkg = prefix.resolve("bin/dpkg")
         val wrapper = prefix.resolve("libexec/forgekit-dpkg")
         val stamp = prefix.resolve("$FORGEKIT_STATE_DIR/dpkg-reloc-stamp")
+        val relocationPending = prefix.resolve(RELOCATION_PENDING)
         Files.createDirectories(wrapper.parent)
 
         // The dpkg wrapper (Dir::Bin::dpkg): fix stale maintainer-script shebangs and newly
@@ -328,6 +362,7 @@ public class BootstrapOrchestrator(
             NEW='${targets.termuxRoot}'
             P='$prefix'
             SELF='$wrapper'
+            RELOCATION_PENDING='$relocationPending'
             discard_deb_workspace() {
               case "${'$'}1" in
                 "${'$'}P/tmp/forgekit-deb."*) rm -rf -- "${'$'}1" ;;
@@ -467,6 +502,9 @@ public class BootstrapOrchestrator(
             }
             case " ${'$'}* " in
               *" --configure "*|*" --unpack "*|*" --install "*|*" -i "*)
+                # dpkg is about to mutate the prefix. Only ForgeKit's serialized full pass
+                # clears this marker after every file and `dpkg --configure -a` succeed.
+                : > "${'$'}RELOCATION_PENDING" || exit 2
                 relocate_maintainer_shebangs
                 relocate_real_dpkg || true
                 relocate_runtime_files
@@ -524,6 +562,7 @@ public class BootstrapOrchestrator(
         initializer: EnvironmentInitializer,
     ): String? {
         try {
+            markRelocationPending()
             PrefixRewriter(logger).rewrite(targets.prefix, relocationRules(descriptor), relocationSkip())
         } catch (e: Exception) {
             return "relocating installed files failed: ${e.message}"
@@ -533,10 +572,21 @@ public class BootstrapOrchestrator(
                 targets.prefix,
                 listOf("${targets.prefix.resolve("bin/dpkg")}", "--configure", "-a"),
             )
+            markRelocationComplete()
             null
         } catch (e: Exception) {
             "completing package configuration failed: ${e.message}"
         }
+    }
+
+    /** Repairs a dirty/migrated prefix once; clean prefixes do no filesystem walk. */
+    public suspend fun reconcileRelocationIfPending(
+        descriptor: BootstrapDescriptor,
+        initializer: EnvironmentInitializer,
+    ): String? = if (relocationReconciliationPending()) {
+        relocateAndConfigure(descriptor, initializer)
+    } else {
+        null
     }
 
     /** Path substitutions that move a Termux-built tree into ForgeKit's directories. */

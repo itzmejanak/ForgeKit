@@ -3,9 +3,11 @@ package com.forgekit.runtime.bootstrap
 import com.forgekit.core.logging.ForgeLogger
 import com.forgekit.core.logging.LogCategory
 import java.io.IOException
+import java.nio.file.AtomicMoveNotSupportedException
 import java.nio.file.Files
 import java.nio.file.Path
 import java.nio.file.Paths
+import java.nio.file.StandardCopyOption
 
 /**
  * Relocates an extracted Termux prefix by rewriting the bootstrap's build-time
@@ -138,10 +140,15 @@ public class PrefixRewriter(
      * take the simple read-everything path.
      */
     private fun rewriteFile(path: Path, size: Long, rules: List<Rule>): Int = when {
-        isElf(path) -> patchElfInPlace(path, size, rules)
+        isElf(path) -> patchInPlace(path, size, rules, padShorterReplacements = true)
         size <= STREAM_CHUNK -> rewriteSmallFile(path, rules)
-        // Large non-ELF (rare): only pay the whole-file heap cost if a needle is actually present.
-        containsAnyNeedle(path, size, rules) -> rewriteSmallFile(path, rules)
+        // Device relocation is an equal-length byte swap, so large JDK/runtime data files can
+        // keep their inode, mode and offsets while using the same bounded window as ELF files.
+        rules.all { it.replacement.size == it.needle.size } ->
+            patchInPlace(path, size, rules, padShorterReplacements = false)
+        // General grow/shrink case: stream through a sibling file and atomically replace only
+        // when a needle is present. Never fall back to Files.readAllBytes for a large file.
+        containsAnyNeedle(path, size, rules) -> rewriteLargeFile(path, rules)
         else -> 0
     }
 
@@ -182,7 +189,17 @@ public class PrefixRewriter(
      * window only patches matches that START before its overlap tail, so nothing is patched twice.
      * In-place writes keep the inode/mode, so exec bits survive.
      */
-    private fun patchElfInPlace(path: Path, size: Long, rules: List<Rule>): Int {
+    private fun patchInPlace(
+        path: Path,
+        size: Long,
+        rules: List<Rule>,
+        padShorterReplacements: Boolean,
+    ): Int {
+        if (!padShorterReplacements) {
+            require(rules.all { it.replacement.size == it.needle.size }) {
+                "non-ELF in-place rewrites must preserve byte length"
+            }
+        }
         val maxNeedle = rules.maxOf { it.needle.size }
         val overlap = (maxNeedle - 1).coerceAtLeast(0)
         val bufSize = minOf(size, (STREAM_CHUNK + overlap).toLong()).toInt().coerceAtLeast(maxNeedle)
@@ -203,7 +220,7 @@ public class PrefixRewriter(
                         if (rule.replacement.size > rule.needle.size) throw elfGrowth(path, rule)
                         raf.seek(start + at)
                         raf.write(rule.replacement)
-                        val pad = rule.needle.size - rule.replacement.size
+                        val pad = if (padShorterReplacements) rule.needle.size - rule.replacement.size else 0
                         if (pad > 0) raf.write(ByteArray(pad))
                         // reflect the patch in the window so a later needle can't re-match it
                         rule.replacement.copyInto(buf, at)
@@ -217,6 +234,95 @@ public class PrefixRewriter(
             }
         }
         return count
+    }
+
+    /**
+     * Bounded grow/shrink replacement for a large non-ELF file. Rules are applied in the same
+     * longest-first sequence as [rewriteSmallFile], one streaming pass per rule, so a later rule
+     * observes an earlier rule's output without retaining the file in memory.
+     */
+    private fun rewriteLargeFile(path: Path, rules: List<Rule>): Int {
+        var hits = 0
+        for (rule in rules) hits += rewriteLargeFileRule(path, rule)
+        return hits
+    }
+
+    private fun rewriteLargeFileRule(path: Path, rule: Rule): Int {
+        val parent = path.parent ?: throw IOException("cannot rewrite a root path: $path")
+        val permissions = runCatching { Files.getPosixFilePermissions(path) }.getOrNull()
+        val modifiedAt = runCatching { Files.getLastModifiedTime(path) }.getOrNull()
+        val temporary = Files.createTempFile(parent, ".forgekit-rewrite-", ".tmp")
+        try {
+            val hits = Files.newInputStream(path).use { input ->
+                Files.newOutputStream(temporary).use { output ->
+                    replaceStreaming(input, output, rule)
+                }
+            }
+            if (hits == 0) return 0
+
+            permissions?.let { Files.setPosixFilePermissions(temporary, it) }
+            modifiedAt?.let { Files.setLastModifiedTime(temporary, it) }
+            try {
+                Files.move(
+                    temporary,
+                    path,
+                    StandardCopyOption.ATOMIC_MOVE,
+                    StandardCopyOption.REPLACE_EXISTING,
+                )
+            } catch (_: AtomicMoveNotSupportedException) {
+                Files.move(temporary, path, StandardCopyOption.REPLACE_EXISTING)
+            }
+            return hits
+        } finally {
+            Files.deleteIfExists(temporary)
+        }
+    }
+
+    /** One-rule streaming replacement with a needle-sized overlap between 8 MiB windows. */
+    private fun replaceStreaming(
+        input: java.io.InputStream,
+        output: java.io.OutputStream,
+        rule: Rule,
+    ): Int {
+        val overlap = (rule.needle.size - 1).coerceAtLeast(0)
+        val window = ByteArray(STREAM_CHUNK + overlap)
+        var carried = 0
+        var hits = 0
+
+        while (true) {
+            val read = input.read(window, carried, STREAM_CHUNK)
+            if (read < 0) break
+            if (read == 0) continue
+            val available = carried + read
+            val ownedEnd = (available - overlap).coerceAtLeast(0)
+            var cursor = 0
+            while (true) {
+                val at = indexOf(window, rule.needle, cursor, available)
+                if (at < 0 || at >= ownedEnd) break
+                output.write(window, cursor, at - cursor)
+                output.write(rule.replacement)
+                cursor = at + rule.needle.size
+                hits++
+            }
+            if (cursor < ownedEnd) {
+                output.write(window, cursor, ownedEnd - cursor)
+                cursor = ownedEnd
+            }
+            carried = available - cursor
+            if (carried > 0) window.copyInto(window, 0, cursor, available)
+        }
+
+        var cursor = 0
+        while (true) {
+            val at = indexOf(window, rule.needle, cursor, carried)
+            if (at < 0) break
+            output.write(window, cursor, at - cursor)
+            output.write(rule.replacement)
+            cursor = at + rule.needle.size
+            hits++
+        }
+        output.write(window, cursor, carried - cursor)
+        return hits
     }
 
     /** Bounded chunked scan: does any needle appear anywhere in [path]? */

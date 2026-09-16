@@ -28,7 +28,7 @@ Only these manifest IDs pass package validation:
 
 Import approval grants every known permission the manifest requested. It also grants default `files.read`, `files.write`, `artifact.write`, and `ui.progress` entries even when undeclared. Grants live in the ViewModel’s in-memory `PermissionManager`; snapshot/restore APIs exist but the app does not persist or restore them.
 
-Most importantly, the current action execution, dependency resolver, network, and filesystem paths do not call `PermissionManager.require`. These grants are not an enforcement boundary yet. The app itself holds Android `INTERNET`, and the embedded runtime can use it. Do not tell users that denying/omitting a ForgeKit permission blocks the underlying operation in `0.1.0`.
+Most importantly, the current action execution, dependency resolver, network, and filesystem paths do not call `PermissionManager.require`. These grants are not an enforcement boundary yet. The app itself holds Android `INTERNET`, and the embedded runtime can use it. Do not tell users that denying/omitting a ForgeKit permission blocks the underlying operation in `0.1.1`.
 
 ### Actual isolation
 

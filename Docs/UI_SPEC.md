@@ -22,7 +22,7 @@ raw Material components; a token change is a one-file change.
 | `ForgePage.kt` | `ForgePageHeader`, `ForgeLazyPage` (scrolling), `ForgePage` (fixed, pinned footer), `ForgeActionBar`, `ForgeButtonRow` |
 | `ForgeFeedback.kt` | `ForgeEmptyState`, `ForgeLoadingState`, `ForgeProgressBar`, `ForgeNoticeBox` |
 | `ForgeSteps.kt` | `ForgeStepList` over presentation-only `ForgeStepVisual` |
-| `ForgeLogConsole.kt` | `ForgeLogConsole` over presentation-only `ForgeLogLineVisual` — transparent on the canvas, auto-follows the tail, pauses on drag, a round arrow button jumps to the latest line |
+| `ForgeLogConsole.kt` | `ForgeLogConsole` over presentation-only `ForgeLogLineVisual` — transparent on the canvas, auto-follows the tail, pauses on drag, and keeps one bottom-right action that shows Copy at the live tail or Go to latest while paused above it |
 | `ForgeTextField.kt` | `ForgeTextField`, `forgeTextFieldColors` |
 | `ForgeDialog.kt` | `ForgeConfirmDialog`, `rememberConfirmGate` (confirmation before consequential actions) |
 | `ForgeToast.kt`, `ForgeInteractionDock.kt` | snackbar presenter; protocol prompt dock |
@@ -74,7 +74,7 @@ by the platform — plugins never draw their own UI. Block kinds:
 requires zero app changes. The renderer composes the same kit components as the
 app (`ForgeTextField`, `ForgeProgressBar`, `ForgeLogConsole`).
 
-## App surfaces (v0.1.0)
+## App surfaces (v0.1.1)
 
 | surface | content |
 |---|---|

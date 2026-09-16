@@ -3,6 +3,7 @@ package com.forgekit.app.terminal
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectDragGestures
+import androidx.compose.foundation.gestures.detectDragGesturesAfterLongPress
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.gestures.detectTransformGestures
 import androidx.compose.foundation.layout.Box
@@ -20,8 +21,6 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
@@ -57,7 +56,9 @@ import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.forgekit.ui.design.ForgePalette
+import com.forgekit.ui.design.ForgeTooltipIconButton
 import com.forgekit.ui.design.ForgeTypography
+import com.forgekit.ui.design.ForgeZoomIndicator
 import com.forgekit.ui.terminal.ExtraModifier
 import com.forgekit.ui.terminal.TerminalEmulator
 import com.forgekit.ui.terminal.TerminalExtraKeys
@@ -68,7 +69,7 @@ import kotlinx.coroutines.delay
 
 /**
  * The live terminal surface: a full-bleed VT view with a Termux-style extra-keys bar,
- * pinch-to-zoom, sticky CTRL/ALT, and a long-press action menu (no header chrome).
+ * pinch-to-zoom, sticky CTRL/ALT, and long-press-and-drag text selection (no header chrome).
  *
  * Layout is a [Column] that owns the IME inset: output (weight 1) then the extra-keys bar,
  * so the bar always sits directly above the soft keyboard and the output fills the rest.
@@ -106,6 +107,7 @@ internal fun TerminalSurface(
     var zoomAccum by remember { mutableFloatStateOf(1f) }
     var selection by remember(emulator) { mutableStateOf<TerminalSelection?>(null) }
     var menuOpen by remember { mutableStateOf(false) }
+    val zoomPercent = fontSize * 100 / DEFAULT_FONT_SIZE
 
     val imeFocus = remember { FocusRequester() }
     val keyboard = LocalSoftwareKeyboardController.current
@@ -165,46 +167,65 @@ internal fun TerminalSurface(
                         onTap = {
                             if (selection != null) selection = null else requestKeyboard()
                         },
-                        onLongPress = { pos ->
-                            val (r, c) = cellAt(pos.x, pos.y)
-                            selection = TerminalSelection(r, c, r, c)
+                    )
+                }
+                .pointerInput(screen.rows, screen.columns, cellWidth, cellHeight, terminalPadPx) {
+                    // One continuous gesture owns range creation. The previous split
+                    // long-press/drag recognizers competed with scrollback and often left
+                    // users with a one-cell selection that could not be extended.
+                    detectDragGesturesAfterLongPress(
+                        onDragStart = { pos ->
+                            val (row, column) = cellAt(pos.x, pos.y)
+                            selection = TerminalSelection(row, column, row, column)
+                        },
+                        onDrag = { change, _ ->
+                            change.consume()
+                            val (row, column) = cellAt(change.position.x, change.position.y)
+                            selection = selection?.copy(endRow = row, endCol = column)
                         },
                     )
                 }
                 .pointerInput(selection != null) {
-                    // While selecting, a drag extends the selection's focus cell.
+                    // After the first range is made, another drag adjusts its focus cell
+                    // without moving the original anchor.
                     if (selection != null) {
                         detectDragGestures { change, _ ->
+                            change.consume()
                             val (r, c) = cellAt(change.position.x, change.position.y)
                             selection = selection?.copy(endRow = r, endCol = c)
                         }
                     }
                 }
-                .pointerInput(Unit) {
-                    // One detector for both gestures (they never conflict — zoom needs two
-                    // fingers, scroll one): pinch → font zoom; vertical pan → scrollback.
-                    var scrollAccum = 0f
-                    detectTransformGestures { _, pan, zoom, _ ->
-                        if (zoom != 1f) {
-                            zoomAccum *= zoom
-                            when {
-                                zoomAccum > 1.15f -> {
-                                    fontSize = (fontSize + 1).coerceAtMost(MAX_FONT_SIZE); zoomAccum = 1f
-                                }
-                                zoomAccum < 0.87f -> {
-                                    fontSize = (fontSize - 1).coerceAtLeast(MIN_FONT_SIZE); zoomAccum = 1f
+                .pointerInput(selection == null) {
+                    // Stop the scroll/zoom recognizer as soon as long-press selection owns
+                    // the pointer stream. This key also prevents this coroutine from keeping
+                    // the stale pre-selection value captured when the surface was composed.
+                    if (selection == null) {
+                        // One detector for both navigation gestures: pinch changes the font;
+                        // a one-finger vertical pan moves through scrollback.
+                        var scrollAccum = 0f
+                        detectTransformGestures { _, pan, zoom, _ ->
+                            if (zoom != 1f) {
+                                zoomAccum *= zoom
+                                when {
+                                    zoomAccum > 1.15f -> {
+                                        fontSize = (fontSize + 1).coerceAtMost(MAX_FONT_SIZE); zoomAccum = 1f
+                                    }
+                                    zoomAccum < 0.87f -> {
+                                        fontSize = (fontSize - 1).coerceAtLeast(MIN_FONT_SIZE); zoomAccum = 1f
+                                    }
                                 }
                             }
-                        }
-                        // Drag (not while selecting) scrolls the transcript. Finger down =
-                        // pull older lines into view (viewport grows); accumulate sub-cell px.
-                        val rowH = cellHeightLatest
-                        if (selection == null && rowH > 0f && pan.y != 0f) {
-                            scrollAccum += pan.y
-                            val rowDelta = (scrollAccum / rowH).toInt()
-                            if (rowDelta != 0) {
-                                emulator.scrollTo(emulator.viewport + rowDelta)
-                                scrollAccum -= rowDelta * rowH
+                            // Finger down pulls older lines into view. Accumulate sub-cell
+                            // movement so small pans are not discarded.
+                            val rowH = cellHeightLatest
+                            if (rowH > 0f && pan.y != 0f) {
+                                scrollAccum += pan.y
+                                val rowDelta = (scrollAccum / rowH).toInt()
+                                if (rowDelta != 0) {
+                                    emulator.scrollTo(emulator.viewport + rowDelta)
+                                    scrollAccum -= rowDelta * rowH
+                                }
                             }
                         }
                     }
@@ -298,17 +319,20 @@ internal fun TerminalSurface(
                 }
             }
 
+            ForgeZoomIndicator(
+                zoomPercent = zoomPercent,
+                modifier = Modifier.align(Alignment.TopCenter).padding(top = 6.dp),
+            )
+
             // Minimal session control (no header): a subtle top-right overflow for the
             // actions a shell can't do itself — clear scrollback view and restart.
             if (selection == null) {
                 Box(Modifier.align(Alignment.TopEnd)) {
-                    IconButton(onClick = { menuOpen = true }) {
-                        Icon(
-                            Icons.Filled.MoreVert,
-                            contentDescription = "Terminal menu",
-                            tint = ForgePalette.textMuted,
-                        )
-                    }
+                    ForgeTooltipIconButton(
+                        icon = Icons.Filled.MoreVert,
+                        tooltip = "Terminal menu",
+                        onClick = { menuOpen = true },
+                    )
                     DropdownMenu(expanded = menuOpen, onDismissRequest = { menuOpen = false }) {
                         DropdownMenuItem(
                             text = { Text(if (emulator.isScrolledBack) "Scroll to bottom" else "Clear screen") },

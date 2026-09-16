@@ -137,7 +137,12 @@ public class EmbeddedTermuxRuntime(
         // §69: initialize environment BEFORE the package manager — it creates $HOME,
         // $TMPDIR and the apt config/state directories the bootstrap does not ship.
         orchestrator.initializeEnvironment(runtimeArchitecture(), bootstrapDescriptor)?.let { return it }
-        return orchestrator.initializePackageManager(bootstrapDescriptor, prefixCommandRunner())
+        val initializer = prefixCommandRunner()
+        orchestrator.initializePackageManager(bootstrapDescriptor, initializer)?.let { return it }
+        // A package transaction from a previous process (or the interactive terminal) may have
+        // completed in dpkg but not in ForgeKit's full relocation/configuration phase. Reconcile
+        // that durable state before advertising the runtime as READY.
+        return orchestrator.reconcileRelocationIfPending(bootstrapDescriptor, initializer)
     }
 
     private fun isPrefixInstalled(): Boolean =
@@ -381,6 +386,32 @@ public class EmbeddedTermuxRuntime(
         // package needs no manager at all (dpkg-query alone decides, §10).
         events.emit(InstallEvent.Phase(dependency, InstallPhase.INSPECTING, "checking for already installed ${dependency.name}"))
         if (isInstalled(dependency)) {
+            if (dependency.kind == RuntimeDependency.Kind.TERMUX_PACKAGE &&
+                orchestrator.relocationReconciliationPending()
+            ) {
+                events.emit(
+                    InstallEvent.Phase(
+                        dependency,
+                        InstallPhase.VERIFYING,
+                        "finishing an interrupted runtime relocation",
+                    ),
+                )
+                val failure = orchestrator.reconcileRelocationIfPending(
+                    bootstrapDescriptor,
+                    prefixCommandRunner(),
+                )
+                val confirmed = isInstalled(dependency)
+                return DependencyInstallResult(
+                    dependency = dependency,
+                    installed = confirmed && failure == null,
+                    alreadyPresent = true,
+                    detail = when {
+                        failure != null -> "present in package database, but $failure"
+                        confirmed -> "already installed; interrupted relocation completed"
+                        else -> "package disappeared while completing interrupted relocation"
+                    },
+                )
+            }
             events.emit(InstallEvent.Phase(dependency, InstallPhase.VERIFYING, "already installed"))
             return DependencyInstallResult(dependency, installed = true, alreadyPresent = true, detail = "already installed")
         }
@@ -400,6 +431,11 @@ public class EmbeddedTermuxRuntime(
 
         var phase = InstallPhase.FETCHING
         events.emit(InstallEvent.Phase(dependency, phase, "installing ${dependency.name} via $tool"))
+        if (dependency.kind == RuntimeDependency.Kind.TERMUX_PACKAGE) {
+            // Write before apt/dpkg changes anything. Only a successful full relocation and
+            // configure pass clears it, so process death can never turn presence into readiness.
+            orchestrator.markRelocationPending()
+        }
         // Streams REAL package-manager output: framed lines are classified into
         // phases (apt/pip markers) and short status lines are surfaced as raw
         // diagnostics (§75 — the output says WHY, never an invented percentage).
@@ -431,13 +467,12 @@ public class EmbeddedTermuxRuntime(
         // stale build-time paths mid-run, and the relocation above then repairs and
         // configures the package. The database is the only honest answer.
         val confirmed = isInstalled(dependency)
-        return if (confirmed) {
+        return if (confirmed && relocationFailure == null) {
             DependencyInstallResult(
                 dependency,
                 installed = true,
                 alreadyPresent = false,
-                detail = relocationFailure?.let { "installed, but $it" }
-                    ?: "installed (${outcome.status})",
+                detail = "installed (${outcome.status})",
             )
         } else {
             DependencyInstallResult(
@@ -445,6 +480,7 @@ public class EmbeddedTermuxRuntime(
                 installed = false,
                 alreadyPresent = false,
                 detail = listOfNotNull(
+                    if (confirmed) "present in package database, but post-install reconciliation failed" else null,
                     "${outcome.status} — ${outcome.output.take(400)}",
                     relocationFailure,
                 ).joinToString(" | "),

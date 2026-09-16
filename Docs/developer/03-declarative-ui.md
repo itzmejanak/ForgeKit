@@ -37,7 +37,7 @@ The `helper` input hint and `confirm` action flag are parsed but not currently r
 
 The host uses Android’s `GetContent` picker, copies the selected content into the app cache, and sends the resulting absolute cache path as a string. The copy is temporary app data; do not assume it survives cache cleanup or app reinstall.
 
-The declared `directory` type currently launches the same content picker as `file`; there is no directory-tree bridge. Treat directory selection as unsupported in `0.1.0`.
+The declared `directory` type currently launches the same content picker as `file`; there is no directory-tree bridge. Treat directory selection as unsupported in `0.1.1`.
 
 ### UI state and action payload
 

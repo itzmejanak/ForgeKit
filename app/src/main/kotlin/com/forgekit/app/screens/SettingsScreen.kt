@@ -2,6 +2,8 @@ package com.forgekit.app.screens
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.Download
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -20,6 +22,7 @@ import com.forgekit.ui.design.ForgePageHeader
 import com.forgekit.ui.design.ForgePalette
 import com.forgekit.ui.design.ForgeSecondaryButton
 import com.forgekit.ui.design.ForgeSpacing
+import com.forgekit.ui.design.ForgeTooltipIconButton
 import com.forgekit.ui.design.MetadataLine
 import com.forgekit.ui.design.SectionHeader
 import com.forgekit.ui.design.StatusChip
@@ -43,7 +46,20 @@ public fun SettingsScreen(
 
     ForgeLazyPage(
         modifier = modifier,
-        header = { ForgePageHeader(title = "Settings", subtitle = "runtime · storage · about") },
+        header = {
+            ForgePageHeader(
+                title = "Settings",
+                subtitle = "runtime · storage · about",
+                trailing = {
+                    ForgeTooltipIconButton(
+                        icon = Icons.Outlined.Download,
+                        tooltip = "Download developer guide as Docs.md",
+                        busy = state.documentation.exporting,
+                        onClick = viewModel::downloadDeveloperDocs,
+                    )
+                },
+            )
+        },
     ) {
         item { SectionHeader("runtime") }
         item {

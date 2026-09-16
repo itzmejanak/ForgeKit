@@ -77,7 +77,7 @@ Give the user/operator:
 - source code and exact source revision;
 - manifest/UI/protocol contract versions;
 - required architecture (`arm64-v8a` today), runtime family, Termux packages, Python/Node packages, network needs, expected install size/time where measured, and offline behavior;
-- every requested permission with a plain-language reason, plus a warning that `0.1.0` permissions are not a complete sandbox;
+- every requested permission with a plain-language reason, plus a warning that `0.1.1` permissions are not a complete sandbox;
 - supported actions, inputs, outputs, interactive prompts, and output location;
 - validation output and real-device test evidence;
 - known limitations, destructive behavior, external services/endpoints, bundled licenses, and update/removal implications;

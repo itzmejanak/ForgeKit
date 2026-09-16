@@ -20,7 +20,7 @@ subprojects {
     val parentPath = project.path.removePrefix(":").substringBeforeLast(':').replace(':', '.')
     group = if (parentPath.isEmpty()) "com.forgekit" else "com.forgekit.$parentPath"
     // One project version for the app and the command-line tools; releases pass the tag's version.
-    version = providers.gradleProperty("forgekit.versionName").getOrElse("0.1.0")
+    version = providers.gradleProperty("forgekit.versionName").getOrElse("0.1.1")
 
     tasks.withType<Test> {
         useJUnitPlatform()

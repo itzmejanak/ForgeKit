@@ -204,6 +204,53 @@ class BootstrapOrchestratorTest {
     }
 
     @Test
+    fun `interrupted relocation stays pending until configure succeeds`() = runBlocking {
+        val root = tmp.resolve("pending-relocation")
+        val localTargets = BootstrapTargets.of(root, stagingDir = tmp.resolve("pending-relocation-stage"))
+        val localOrchestrator = BootstrapOrchestrator(localTargets)
+        val bin = Files.createDirectories(localTargets.prefix.resolve("bin"))
+        Files.createSymbolicLink(bin.resolve("bash"), Path.of("/bin/sh"))
+        Files.createSymbolicLink(bin.resolve("sh"), Path.of("/bin/sh"))
+
+        val installedRoot = localTargets.termuxRoot.toString()
+        val compiledRoot = installedRoot.dropLast(1) + "x"
+        val descriptor = BootstrapDescriptor(
+            abi = "arm64-v8a",
+            source = FileBootstrapSource(tmp.resolve("unused-pending.zip")),
+            expectedSha256 = null,
+            expectedSizeBytes = null,
+            termuxSuite = "apt-android-7",
+            compiledDataRoot = compiledRoot,
+            compiledCacheRoot = installedRoot.dropLast(1) + "y",
+        )
+        val stale = Files.createDirectories(localTargets.prefix.resolve("share"))
+            .resolve("runtime-index")
+        Files.writeString(stale, "prefix=$compiledRoot/usr\n")
+
+        assertNull(localOrchestrator.initializeEnvironment("arm64", descriptor))
+        assertTrue(
+            localOrchestrator.relocationReconciliationPending(),
+            "an existing prefix without the current schema marker must migrate",
+        )
+
+        val failure = localOrchestrator.reconcileRelocationIfPending(descriptor) { _, _ ->
+            error("simulated configure interruption")
+        }
+        assertTrue(failure?.contains("simulated configure interruption") == true, "failure was: $failure")
+        assertTrue(
+            localOrchestrator.relocationReconciliationPending(),
+            "failed configure must leave durable recovery work",
+        )
+
+        assertNull(localOrchestrator.reconcileRelocationIfPending(descriptor) { _, command ->
+            assertEquals(listOf(localTargets.prefix.resolve("bin/dpkg").toString(), "--configure", "-a"), command)
+            "configured"
+        })
+        assertTrue(!localOrchestrator.relocationReconciliationPending(), "success must clear pending last")
+        assertEquals("prefix=$installedRoot/usr\n", Files.readString(stale))
+    }
+
+    @Test
     fun `dpkg wrapper repairs a self replacement once without rewriting itself`() {
         val root = tmp.resolve("wrapper-self-update")
         val localTargets = BootstrapTargets.of(root, stagingDir = tmp.resolve("wrapper-stage"))

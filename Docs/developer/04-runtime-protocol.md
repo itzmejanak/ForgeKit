@@ -73,6 +73,6 @@ TERMUX_APP__DATA_DIR TERMUX__ROOTFS TERMUX__HOME TERMUX__PREFIX
 FORGEKIT_OUTPUT
 ```
 
-Plugin actions additionally receive `FORGE_PACKAGE` (installed plugin root), `FORGE_HOME` (Termux home when using the embedded runtime), and `TERM=xterm-256color`. The working directory is the installed plugin root. The `PluginContext` type defines `FORGE_JOB_ID`, `FORGE_PLUGIN_ID`, `FORGE_WORKDIR`, and `FORGE_PROTOCOL`, but the current action-run assembly does not add those four variables; do not rely on them in `0.1.0`.
+Plugin actions additionally receive `FORGE_PACKAGE` (installed plugin root), `FORGE_HOME` (Termux home when using the embedded runtime), and `TERM=xterm-256color`. The working directory is the installed plugin root. The `PluginContext` type defines `FORGE_JOB_ID`, `FORGE_PLUGIN_ID`, `FORGE_WORKDIR`, and `FORGE_PROTOCOL`, but the current action-run assembly does not add those four variables; do not rely on them in `0.1.1`.
 
 Executables and working directories are host-checked to remain under the ForgeKit app-owned root or Termux root. This is a path gate, not a per-plugin filesystem sandbox.

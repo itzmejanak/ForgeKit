@@ -115,7 +115,7 @@ Only needed to test signing; normal releases come from CI.
 export FORGEKIT_KEYSTORE_FILE=~/.forgekit-signing/forgekit-release.jks
 export FORGEKIT_KEY_ALIAS=forgekit
 read -rs FORGEKIT_KEYSTORE_PASSWORD && export FORGEKIT_KEYSTORE_PASSWORD FORGEKIT_KEY_PASSWORD="$FORGEKIT_KEYSTORE_PASSWORD"
-./gradlew :app:assembleRelease -Pforgekit.versionName=0.1.0 -Pforgekit.versionCode=1000099
+./gradlew :app:assembleRelease -Pforgekit.versionName=0.1.1 -Pforgekit.versionCode=10199
 ```
 
 Without any signing variables `assembleRelease` produces an unsigned APK. A partial signing

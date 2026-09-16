@@ -8,11 +8,11 @@ plugins {
 val developerDocsSource = rootProject.layout.projectDirectory.dir("Docs/developer")
 val stagedDeveloperDocs = layout.buildDirectory.dir("generated/developer-docs/assets")
 val stagedLegalNotices = layout.buildDirectory.dir("generated/legal-notices/assets")
-val forgeKitVersionName = providers.gradleProperty("forgekit.versionName").getOrElse("0.1.0")
+val forgeKitVersionName = providers.gradleProperty("forgekit.versionName").getOrElse("0.1.1")
 val forgeKitVersionCode = providers.gradleProperty("forgekit.versionCode").orNull?.let { raw ->
     raw.toIntOrNull()?.takeIf { it in 1..2_100_000_000 }
         ?: throw GradleException("forgekit.versionCode must be an integer from 1 to 2100000000")
-} ?: 1
+} ?: 10_199
 val verifyDeveloperDocs by tasks.registering {
     inputs.dir(developerDocsSource)
     doLast {

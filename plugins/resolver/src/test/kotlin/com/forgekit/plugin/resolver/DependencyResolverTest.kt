@@ -154,7 +154,7 @@ class DependencyResolverTest {
     }
 
     @Test
-    fun `already-present deps are reported without any Resolving event`() = runBlocking {
+    fun `already-present streaming deps still pass through idempotent runtime reconciliation`() = runBlocking {
         val dir = Files.createTempDirectory("resolver-present-install")
         try {
             val binaryManifest = parser.parse(
@@ -176,8 +176,9 @@ class DependencyResolverTest {
 
             val planned = events.filterIsInstance<ResolutionEvent.Planned>().single()
             assertTrue(planned.plans.all { it.alreadyPresent }, "all present in the runtime db: $planned")
-            assertTrue(events.none { it is ResolutionEvent.Resolving }, "present deps must not be re-installed")
+            assertTrue(events.none { it is ResolutionEvent.Resolving }, "resolver must not invent a missing phase")
             assertEquals(1, events.filterIsInstance<ResolutionEvent.Completed>().size)
+            assertEquals(1, runtime.installCalls, "presence must not bypass runtime reconciliation")
             assertTrue(report.verified)
         } finally {
             dir.toFile().deleteRecursively()
@@ -221,12 +222,17 @@ class DependencyResolverTest {
      * takes the package-database presence branch instead of the tool heuristic.
      */
     private class PresentRuntime(private val base: HostRuntime) : ForgeRuntime by base, StreamingInstaller {
+        var installCalls: Int = 0
+            private set
+
         override suspend fun isInstalled(dependency: RuntimeDependency): Boolean = true
 
         override suspend fun installStreaming(
             dependency: RuntimeDependency,
             events: FlowCollector<InstallEvent>,
-        ): DependencyInstallResult =
-            DependencyInstallResult(dependency, installed = true, alreadyPresent = true, detail = "present")
+        ): DependencyInstallResult {
+            installCalls++
+            return DependencyInstallResult(dependency, installed = true, alreadyPresent = true, detail = "present")
+        }
     }
 }
